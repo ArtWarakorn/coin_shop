@@ -33,6 +33,8 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
   const currentProduct = products.find((p) => p.id === Number(selectedProductId)) || products[0];
+  const unitPrice = currentProduct?.price || 3.5;
+  const totalPrice = Number((quantity * unitPrice).toFixed(2));
 
   const handleOrderSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,6 +56,7 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
         product_id: Number(selectedProductId),
         color: finalColor,
         quantity: Number(quantity),
+        total_price: totalPrice,
         customer_note: customerNote.trim() || null,
         status: 'pending',
       });
@@ -207,16 +210,26 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
 
             {currentProduct && (
               <div className="mb-4 rounded-lg overflow-hidden border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800">
-                <div className="h-36 relative bg-gray-100 dark:bg-gray-700">
+                <div className="h-44 relative bg-gray-100 dark:bg-gray-700 flex items-center justify-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={currentProduct.image_url}
                     alt={currentProduct.name}
                     className="w-full h-full object-cover"
+                    onError={(e) => {
+                      (e.currentTarget as HTMLImageElement).src =
+                        'https://images.unsplash.com/photo-1596461404969-9ae70f2830c1?w=600&auto=format&fit=crop&q=80';
+                    }}
                   />
+                  <span className="absolute top-2 right-2 bg-amber-500/95 text-white text-[11px] font-semibold px-2 py-0.5 rounded shadow-sm">
+                    Pre-order 4-5 วัน
+                  </span>
                 </div>
                 <div className="p-3">
                   <p className="font-semibold text-sm">{currentProduct.name}</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mt-0.5">
+                    ⏳ ผลิตตามคิวสั่งทำ: Pre-order 4-5 วัน
+                  </p>
                   <p className="text-xs text-gray-500 mt-0.5 line-clamp-1">
                     {currentProduct.description || 'เหรียญโปรยทานริบบิ้น งานฝีมือประณีต'}
                   </p>
@@ -238,8 +251,32 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
                 </span>
               </div>
               <div className="summary-row">
+                <span>ราคาต่ออัน</span>
+                <div className="text-right">
+                  <span className="font-medium text-gray-900 dark:text-gray-100">฿{unitPrice.toFixed(2)} / อัน</span>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-normal">
+                    (พร้อมใส่เหรียญ 1 บาท)
+                  </span>
+                </div>
+              </div>
+              <div className="summary-row">
                 <span>จำนวนที่สั่ง</span>
-                <span className="summary-highlight">{quantity} ดอก</span>
+                <span className="summary-highlight">{quantity} อัน</span>
+              </div>
+              <div className="summary-row">
+                <span>ยอดรวมทั้งหมด</span>
+                <div className="text-right">
+                  <span className="text-base font-bold text-amber-600 dark:text-amber-400">
+                    ฿{totalPrice.toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                  </span>
+                  <span className="text-[11px] text-emerald-600 dark:text-emerald-400 block font-normal">
+                    (ราคารวมเหรียญบาทเรียบร้อยแล้ว)
+                  </span>
+                </div>
+              </div>
+              <div className="summary-row">
+                <span>ระยะเวลาเตรียมของ</span>
+                <span className="font-semibold text-amber-600 dark:text-amber-400">Pre-order 4-5 วัน</span>
               </div>
               <div className="summary-row total">
                 <span>สถานะหลังสั่ง</span>

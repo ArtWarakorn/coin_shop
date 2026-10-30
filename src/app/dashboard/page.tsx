@@ -119,16 +119,32 @@ export default async function DashboardPage() {
                   key={item.id}
                   className="bg-white dark:bg-gray-800 rounded-xl overflow-hidden border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow transition"
                 >
-                  <div className="h-44 bg-gray-100 dark:bg-gray-700 relative">
+                  <div className="h-48 bg-gray-100 dark:bg-gray-700 relative flex items-center justify-center">
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img
                       src={item.image_url}
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />
+                    <span className="absolute top-2 right-2 bg-amber-500/95 text-white text-[11px] font-semibold px-2 py-0.5 rounded shadow-sm backdrop-blur-xs">
+                      Pre-order 4-5 วัน
+                    </span>
                   </div>
                   <div className="p-4">
-                    <h3 className="font-bold text-base">{item.name}</h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-bold text-base">{item.name}</h3>
+                      <div className="text-right">
+                        <span className="text-amber-600 dark:text-amber-400 font-bold text-sm whitespace-nowrap block">
+                          ฿{(item.price || 3.5).toFixed(2)} / อัน
+                        </span>
+                        <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-medium block">
+                          (ราคารวมใส่เหรียญ 1 บาทแล้ว)
+                        </span>
+                      </div>
+                    </div>
+                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium mt-1">
+                      ⏳ ระยะเวลาผลิต: Pre-order 4-5 วัน
+                    </p>
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1 line-clamp-2">
                       {item.description || 'เหรียญโปรยทานริบบิ้น งานฝีมือประณีต'}
                     </p>
@@ -166,6 +182,7 @@ export default async function DashboardPage() {
                     <th className="px-4 py-3 font-semibold">สินค้า</th>
                     <th className="px-4 py-3 font-semibold">สีริบบิ้น</th>
                     <th className="px-4 py-3 font-semibold">จำนวน</th>
+                    <th className="px-4 py-3 font-semibold">ยอดรวม</th>
                     <th className="px-4 py-3 font-semibold">สถานะ</th>
                     <th className="px-4 py-3 font-semibold">วันที่สั่ง</th>
                   </tr>
@@ -178,6 +195,9 @@ export default async function DashboardPage() {
                         <td className="px-4 py-3">{order.product?.name || `Product ID ${order.product_id}`}</td>
                         <td className="px-4 py-3">{order.color}</td>
                         <td className="px-4 py-3">{order.quantity} ดอก</td>
+                        <td className="px-4 py-3 font-semibold text-amber-600 dark:text-amber-400">
+                          ฿{(order.total_price || (order.quantity * (order.product?.price || 3.5))).toLocaleString('th-TH', { minimumFractionDigits: 2 })}
+                        </td>
                         <td className="px-4 py-3">
                           <span className="inline-flex px-2 py-0.5 text-xs font-medium rounded-full bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300">
                             {order.status}
@@ -190,7 +210,7 @@ export default async function DashboardPage() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center text-gray-500">
+                      <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
                         ยังไม่มีรายการสั่งทำ
                       </td>
                     </tr>

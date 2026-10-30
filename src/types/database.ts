@@ -31,6 +31,7 @@ export interface Product {
   name: string;
   image_url: string;
   description: string | null;
+  price: number;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -42,6 +43,7 @@ export interface Order {
   product_id: number;
   color: string;
   quantity: number;
+  total_price: number;
   customer_note: string | null;
   status: OrderStatus;
   created_at: string;

@@ -122,6 +122,19 @@ export default function LoginPage() {
             สมัครสมาชิก
           </Link>
         </div>
+
+        <div className="mt-6 border-t border-gray-200 dark:border-gray-700 pt-4 text-center text-sm">
+          <p className="text-gray-500 dark:text-gray-400">ติดต่อผู้พัฒนา</p>
+          <p className="mt-1 font-medium text-gray-700 dark:text-gray-200">
+            วรากร จันทร์สูงเนิน
+          </p>
+          <a
+            href="mailto:junsongneanart@gmail.com"
+            className="text-amber-600 hover:underline dark:text-amber-400"
+          >
+            email : junsongneanart@gmail.com
+          </a>
+        </div>
       </div>
     </div>
   );

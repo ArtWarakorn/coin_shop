@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
 import type { Profile, Product, Order } from '@/types/database';
@@ -25,6 +26,12 @@ export default async function DashboardPage() {
     .single();
 
   const userProfile = profile as Profile | null;
+  const displayName =
+    userProfile?.username ||
+    userProfile?.full_name ||
+    user.user_metadata?.username ||
+    user.user_metadata?.full_name ||
+    user.email;
 
   // Fetch active products
   const { data: products } = await supabase
@@ -33,14 +40,14 @@ export default async function DashboardPage() {
     .eq('is_active', true)
     .order('created_at', { ascending: false });
 
-  // Fetch customer orders (or all if seller/admin)
-  const isStaff = userProfile?.role === 'admin' || userProfile?.role === 'seller';
+  // Orders query: Admin sees all orders, whereas Customers & Sellers see only their own orders
+  const isAdmin = userProfile?.role === 'admin';
   const orderQuery = supabase
     .from('orders')
     .select('*, product:products(*)')
     .order('created_at', { ascending: false });
 
-  if (!isStaff) {
+  if (!isAdmin) {
     orderQuery.eq('customer_id', user.id);
   }
 
@@ -68,8 +75,16 @@ export default async function DashboardPage() {
           </div>
 
           <div className="flex items-center gap-4">
+            {userProfile?.role === 'admin' && (
+              <Link
+                href="/admin"
+                className="text-xs font-semibold px-3 py-1.5 rounded-lg bg-amber-600 hover:bg-amber-700 text-white shadow-xs transition flex items-center gap-1.5"
+              >
+                ⚙️ ระบบแอดมิน (Admin Console)
+              </Link>
+            )}
             <span className="text-sm text-gray-600 dark:text-gray-300">
-              สวัสดี, <strong className="font-semibold">{userProfile?.full_name || user.email}</strong>
+              สวัสดี, <strong className="font-semibold">{displayName}</strong>
             </span>
             <form action={handleSignOut}>
               <button
@@ -166,10 +181,12 @@ export default async function DashboardPage() {
         <section>
           <div className="mb-4">
             <h2 className="text-xl font-bold">
-              {isStaff ? 'รายการสั่งทำทั้งหมด (Admin / Seller)' : 'ประวัติการสั่งทำของฉัน'}
+              {isAdmin ? 'รายการสั่งทำทั้งหมด (Admin System View)' : 'ประวัติการสั่งทำของฉัน'}
             </h2>
             <p className="text-sm text-gray-500">
-              ควบคุมการมองเห็นด้วย Row Level Security (RLS)
+              {isAdmin
+                ? 'แสดงคำสั่งทำทั้งหมดในระบบร้านเหรียญโปรยทาน'
+                : 'แสดงเฉพาะคำสั่งทำของคุณเท่านั้น'}
             </p>
           </div>
 

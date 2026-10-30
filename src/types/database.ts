@@ -1,0 +1,51 @@
+export type Json =
+  | string
+  | number
+  | boolean
+  | null
+  | { [key: string]: Json | undefined }
+  | Json[]
+
+export type UserRole = 'customer' | 'seller' | 'admin';
+
+export type OrderStatus =
+  | 'pending'
+  | 'confirmed'
+  | 'in_production'
+  | 'ready'
+  | 'completed'
+  | 'cancelled';
+
+export interface Profile {
+  id: string;
+  username: string;
+  full_name: string;
+  phone: string;
+  role: UserRole;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Product {
+  id: number;
+  name: string;
+  image_url: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Order {
+  id: number;
+  customer_id: string;
+  product_id: number;
+  color: string;
+  quantity: number;
+  customer_note: string | null;
+  status: OrderStatus;
+  created_at: string;
+  updated_at: string;
+  product?: Product;
+  customer?: Profile;
+}

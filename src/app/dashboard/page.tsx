@@ -58,6 +58,12 @@ export default async function DashboardPage() {
   }
 
   const userProfile = profile as Profile | null;
+
+  // Redirect sellers to their dedicated area
+  if (userProfile?.role === 'seller') {
+    redirect('/seller');
+  }
+
   const displayUsername =
     userProfile?.username ||
     (user.user_metadata?.username as string) ||

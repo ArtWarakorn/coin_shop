@@ -43,14 +43,25 @@ export default function LoginPage() {
       return;
     }
 
+    // Role-based redirect: seller -> /seller, admin -> /admin, customer -> /dashboard
+    const role =
+      typeof result === 'object' && result !== null && 'role' in result
+        ? (result as { role: string }).role
+        : 'customer';
+
     const requestedDestination = new URLSearchParams(window.location.search).get('redirectTo');
     const destinationUrl = requestedDestination
       ? new URL(requestedDestination, window.location.origin)
       : null;
+
+    let defaultDestination = '/dashboard';
+    if (role === 'seller') defaultDestination = '/seller';
+    else if (role === 'admin') defaultDestination = '/admin';
+
     const destination =
       destinationUrl?.origin === window.location.origin
         ? `${destinationUrl.pathname}${destinationUrl.search}${destinationUrl.hash}`
-        : '/dashboard';
+        : defaultDestination;
 
     router.replace(destination);
     router.refresh();

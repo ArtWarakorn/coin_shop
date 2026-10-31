@@ -59,5 +59,39 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  // Role-based guard for /seller/* — only sellers are allowed
+  if (user && pathname.startsWith('/seller')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const role = (profile as { role?: string } | null)?.role;
+    if (role !== 'seller') {
+      const url = request.nextUrl.clone();
+      url.pathname = role === 'admin' ? '/admin' : '/dashboard';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+
+  // Role-based guard for /admin — only admins are allowed (defence in depth)
+  if (user && pathname.startsWith('/admin')) {
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle();
+
+    const role = (profile as { role?: string } | null)?.role;
+    if (role !== 'admin') {
+      const url = request.nextUrl.clone();
+      url.pathname = role === 'seller' ? '/seller' : '/dashboard';
+      url.search = '';
+      return NextResponse.redirect(url);
+    }
+  }
+
   return supabaseResponse;
 }

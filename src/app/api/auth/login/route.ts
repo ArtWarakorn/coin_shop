@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { createAuthClient } from '@/lib/supabase/server';
+import { createClient } from '@/lib/supabase/server';
 
 function jsonResponse(body: object, status: number) {
   return NextResponse.json(body, {
@@ -51,8 +52,8 @@ export async function POST(request: Request) {
     return jsonResponse({ error: 'ระบบเข้าสู่ระบบยังไม่พร้อมใช้งาน' }, 503);
   }
 
-  const supabase = await createAuthClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const authClient = await createAuthClient();
+  const { data: authData, error } = await authClient.auth.signInWithPassword({ email, password });
 
   if (error) {
     if (error.status === 500 || error.message === 'Database error querying schema') {
@@ -79,5 +80,17 @@ export async function POST(request: Request) {
     return jsonResponse({ error: 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' }, 401);
   }
 
-  return jsonResponse({ success: true }, 200);
+  // After successful sign-in, read the user's role so the client can redirect correctly
+  let role: string = 'customer';
+  if (authData?.user?.id) {
+    const coinClient = await createClient();
+    const { data: profile } = await coinClient
+      .from('profiles')
+      .select('role')
+      .eq('id', authData.user.id)
+      .maybeSingle();
+    role = (profile as { role?: string } | null)?.role ?? 'customer';
+  }
+
+  return jsonResponse({ success: true, role }, 200);
 }

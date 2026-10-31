@@ -33,6 +33,7 @@ export interface Product {
   description: string | null;
   price: number;
   is_active: boolean;
+  seller_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -41,11 +42,13 @@ export interface Order {
   id: number;
   customer_id: string;
   product_id: number;
+  seller_id: string | null;
   color: string;
   quantity: number;
   total_price: number;
   customer_note: string | null;
   status: OrderStatus;
+  due_date: string;
   created_at: string;
   updated_at: string;
   product?: Product;

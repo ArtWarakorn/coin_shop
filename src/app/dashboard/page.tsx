@@ -19,18 +19,58 @@ export default async function DashboardPage() {
   }
 
   // Fetch user profile from coin_shop.profiles
-  const { data: profile } = await supabase
+  let { data: profile } = await supabase
     .from('profiles')
     .select('*')
     .eq('id', user.id)
-    .single();
+    .maybeSingle();
+
+  // Self-heal: If profile does not exist yet in coin_shop.profiles, auto-insert from auth metadata
+  if (!profile) {
+    const fallbackUsername =
+      (user.user_metadata?.username as string) ||
+      (user.user_metadata?.user_name as string) ||
+      user.email?.split('@')[0] ||
+      'user_' + user.id.slice(0, 6);
+    const fallbackFullName =
+      (user.user_metadata?.full_name as string) ||
+      (user.user_metadata?.fullName as string) ||
+      user.email ||
+      '';
+    const fallbackPhone = (user.user_metadata?.phone as string) || '';
+
+    const { data: newProfile } = await supabase
+      .from('profiles')
+      .upsert({
+        id: user.id,
+        username: fallbackUsername,
+        full_name: fallbackFullName,
+        phone: fallbackPhone,
+        role: 'customer',
+        updated_at: new Date().toISOString(),
+      })
+      .select('*')
+      .maybeSingle();
+
+    if (newProfile) {
+      profile = newProfile;
+    }
+  }
 
   const userProfile = profile as Profile | null;
-  const displayName =
+  const displayUsername =
     userProfile?.username ||
+    (user.user_metadata?.username as string) ||
+    (user.user_metadata?.user_name as string) ||
+    user.email?.split('@')[0] ||
+    'สมาชิก';
+  const displayPhone =
+    userProfile?.phone ||
+    (user.user_metadata?.phone as string) ||
+    '-';
+  const displayName =
     userProfile?.full_name ||
-    user.user_metadata?.username ||
-    user.user_metadata?.full_name ||
+    displayUsername ||
     user.email;
 
   // Fetch active products
@@ -103,9 +143,9 @@ export default async function DashboardPage() {
         {/* Profile Card */}
         <div className="bg-white dark:bg-gray-800 p-6 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-lg font-bold">ข้อมูลผู้ใช้งาน (Schema: coin_shop)</h2>
+            <h2 className="text-lg font-bold">ข้อมูลผู้ใช้งาน coin shop</h2>
             <p className="text-sm text-gray-500 dark:text-gray-400 mt-0.5">
-              @{userProfile?.username} | เบอร์โทร: {userProfile?.phone || '-'}
+              @{displayUsername} | เบอร์โทร: {displayPhone}
             </p>
           </div>
           <div className="text-xs text-gray-500">

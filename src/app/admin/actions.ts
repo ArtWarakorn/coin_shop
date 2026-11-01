@@ -4,6 +4,11 @@ import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import type { OrderStatus, UserRole } from '@/types/database';
 
+function errorMessage(err: unknown, fallback: string) {
+  return (err instanceof Error && err.message) || fallback;
+}
+
+// Mutations ask Supabase Auth directly (getUser) so a revoked session cannot write.
 async function verifyAdmin() {
   const supabase = await createClient();
   const {
@@ -46,8 +51,8 @@ export async function updateOrderStatusAction(orderId: number, nextStatus: Order
     revalidatePath('/admin');
     revalidatePath('/dashboard');
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'เกิดข้อผิดพลาดในการอัปเดตสถานะคำสั่งทำ' };
+  } catch (err: unknown) {
+    return { success: false, error: errorMessage(err, 'เกิดข้อผิดพลาดในการอัปเดตสถานะคำสั่งทำ') };
   }
 }
 
@@ -75,7 +80,7 @@ export async function updateUserRoleAction(targetUserId: string, nextRole: UserR
     revalidatePath('/admin');
     revalidatePath('/dashboard');
     return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err?.message || 'เกิดข้อผิดพลาดในการเปลี่ยนสิทธิ์ผู้ใช้' };
+  } catch (err: unknown) {
+    return { success: false, error: errorMessage(err, 'เกิดข้อผิดพลาดในการเปลี่ยนสิทธิ์ผู้ใช้') };
   }
 }

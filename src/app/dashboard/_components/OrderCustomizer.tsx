@@ -3,11 +3,19 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
+import {
+  MAX_ORDER_QUANTITY,
+  MIN_ORDER_QUANTITY,
+  ORDER_QUANTITY_STEP,
+  validateOrderQuantity,
+} from '@/lib/orders/rules';
 import type { Product } from '@/types/database';
 
 interface OrderCustomizerProps {
   products: Product[];
   userId: string;
+  /** Product to preselect, e.g. from a "สั่งทำลายนี้" link. */
+  initialProductId?: number;
 }
 
 const COLOR_PRESETS = [
@@ -19,15 +27,15 @@ const COLOR_PRESETS = [
   'คละสีมงคล 5 สี',
 ];
 
-export default function OrderCustomizer({ products, userId }: OrderCustomizerProps) {
+export default function OrderCustomizer({ products, userId, initialProductId }: OrderCustomizerProps) {
   const router = useRouter();
 
   const [selectedProductId, setSelectedProductId] = useState<number>(
-    products[0]?.id || 0
+    products.find((p) => p.id === initialProductId)?.id ?? products[0]?.id ?? 0
   );
   const [selectedColor, setSelectedColor] = useState<string>(COLOR_PRESETS[0]);
   const [customColor, setCustomColor] = useState<string>('');
-  const [quantity, setQuantity] = useState<number>(100);
+  const [quantity, setQuantity] = useState<number>(Math.max(100, MIN_ORDER_QUANTITY));
   const [customerNote, setCustomerNote] = useState<string>('');
   const [submitting, setSubmitting] = useState<boolean>(false);
   const [feedback, setFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
@@ -45,6 +53,13 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
 
     if (!selectedProductId) {
       setFeedback({ type: 'error', message: 'กรุณาเลือกลายเหรียญโปรยทาน' });
+      setSubmitting(false);
+      return;
+    }
+
+    const quantityError = validateOrderQuantity(quantity);
+    if (quantityError) {
+      setFeedback({ type: 'error', message: quantityError });
       setSubmitting(false);
       return;
     }
@@ -80,7 +95,7 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
   };
 
   return (
-    <div className="order-customizer-card">
+    <div id="order-customizer" className="order-customizer-card">
       <div className="order-customizer-header">
         <div className="flex items-center justify-between">
           <h2 className="order-customizer-title">
@@ -164,15 +179,17 @@ export default function OrderCustomizer({ products, userId }: OrderCustomizerPro
               <input
                 id="quantity-input"
                 type="number"
-                min="10"
-                step="10"
+                min={MIN_ORDER_QUANTITY}
+                max={MAX_ORDER_QUANTITY}
+                step={ORDER_QUANTITY_STEP}
                 required
                 value={quantity}
-                onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+                onChange={(e) => setQuantity(Number(e.target.value))}
                 className="theme-input"
               />
               <span className="text-xs text-gray-500 mt-1 block">
-                ขั้นต่ำ 50-100 เหรียญขึ้นไป
+                ขั้นต่ำ {MIN_ORDER_QUANTITY.toLocaleString('th-TH')} ดอก สูงสุด{' '}
+                {MAX_ORDER_QUANTITY.toLocaleString('th-TH')} ดอกต่อออเดอร์
               </span>
             </div>
 

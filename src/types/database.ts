@@ -8,13 +8,16 @@ export type Json =
 
 export type UserRole = 'customer' | 'seller' | 'admin';
 
-export type OrderStatus =
-  | 'pending'
-  | 'confirmed'
-  | 'in_production'
-  | 'ready'
-  | 'completed'
-  | 'cancelled';
+export const ORDER_STATUSES = [
+  'pending',
+  'confirmed',
+  'in_production',
+  'ready',
+  'completed',
+  'cancelled',
+] as const;
+
+export type OrderStatus = (typeof ORDER_STATUSES)[number];
 
 export interface Profile {
   id: string;
@@ -51,6 +54,6 @@ export interface Order {
   due_date: string;
   created_at: string;
   updated_at: string;
-  product?: Product;
-  customer?: Profile;
+  product?: Pick<Product, 'name' | 'price'>;
+  customer?: Pick<Profile, 'full_name' | 'username' | 'phone'>;
 }

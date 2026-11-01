@@ -1,24 +1,27 @@
-import { NextResponse } from 'next/server';
 import { createAuthClient, createClient } from '@/lib/supabase/server';
+import { hasJsonContentType, isRecord, jsonResponse } from '@/app/api/_lib/http';
 
-function jsonResponse(body: object, status: number) {
-  return NextResponse.json(body, {
-    status,
-    headers: { 'Cache-Control': 'no-store' },
-  });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
+function describeSignUpError(error: { status?: number; code?: string; message: string }) {
+  const message = error.message ?? '';
+  if (error.code === 'user_already_exists' || /already registered/i.test(message)) {
+    return { status: 409, message: 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น' };
+  }
+  // The profile trigger fails on a duplicate username (unique index on lower(username)).
+  if (/database error saving new user/i.test(message)) {
+    return { status: 409, message: 'user_name นี้ถูกใช้งานแล้ว กรุณาเลือกชื่ออื่น' };
+  }
+  if (error.code === 'weak_password' || /password/i.test(message)) {
+    return { status: 400, message: 'รหัสผ่านไม่ปลอดภัยเพียงพอ กรุณาใช้รหัสผ่านที่คาดเดายากขึ้น' };
+  }
+  if (error.code === 'over_email_send_rate_limit' || error.status === 429) {
+    return { status: 429, message: 'มีการสมัครถี่เกินไป กรุณารอสักครู่แล้วลองอีกครั้ง' };
+  }
+  console.error('Unexpected sign-up error:', { status: error.status, code: error.code, message });
+  return { status: 400, message: 'ไม่สามารถลงทะเบียนได้ กรุณาลองอีกครั้ง' };
 }
 
 export async function POST(request: Request) {
-  const contentType = request.headers
-    .get('content-type')
-    ?.split(';', 1)[0]
-    .trim()
-    .toLowerCase();
-  if (contentType !== 'application/json') {
+  if (!hasJsonContentType(request)) {
     return jsonResponse({ error: 'รูปแบบคำขอต้องเป็น application/json' }, 415);
   }
 
@@ -96,12 +99,19 @@ export async function POST(request: Request) {
   });
 
   if (authError) {
-    return jsonResponse({ error: authError.message || 'ไม่สามารถลงทะเบียนได้' }, 400);
+    const { status, message } = describeSignUpError(authError);
+    return jsonResponse({ error: message }, status);
   }
 
   const newUser = authData.user;
   if (!newUser) {
     return jsonResponse({ error: 'ไม่สามารถสร้างผู้ใช้งานได้' }, 500);
+  }
+
+  // With email confirmation on, Supabase answers "success" for an address that is
+  // already registered but returns a user with no identities. Treat it as taken.
+  if (Array.isArray(newUser.identities) && newUser.identities.length === 0) {
+    return jsonResponse({ error: 'อีเมลนี้ถูกใช้งานแล้ว กรุณาเข้าสู่ระบบหรือใช้อีเมลอื่น' }, 409);
   }
 
   // 2. Ensure profile exists in coin_shop.profiles (in case DB trigger is not active)

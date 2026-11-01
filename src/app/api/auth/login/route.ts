@@ -1,25 +1,8 @@
-import { NextResponse } from 'next/server';
-import { createAuthClient } from '@/lib/supabase/server';
-import { createClient } from '@/lib/supabase/server';
-
-function jsonResponse(body: object, status: number) {
-  return NextResponse.json(body, {
-    status,
-    headers: { 'Cache-Control': 'no-store' },
-  });
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+import { createAuthClient, createClient } from '@/lib/supabase/server';
+import { hasJsonContentType, isRecord, jsonResponse } from '@/app/api/_lib/http';
 
 export async function POST(request: Request) {
-  const contentType = request.headers
-    .get('content-type')
-    ?.split(';', 1)[0]
-    .trim()
-    .toLowerCase();
-  if (contentType !== 'application/json') {
+  if (!hasJsonContentType(request)) {
     return jsonResponse({ error: 'รูปแบบคำขอไม่ถูกต้อง' }, 415);
   }
 

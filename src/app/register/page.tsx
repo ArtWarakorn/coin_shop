@@ -5,6 +5,33 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/lib/supabase/client';
 
+interface FormFieldProps {
+  label: string;
+  type?: string;
+  value: string;
+  onChange: (value: string) => void;
+  placeholder: string;
+  minLength?: number;
+  maxLength?: number;
+}
+
+function FormField({ label, type = 'text', onChange, ...inputProps }: FormFieldProps) {
+  return (
+    <div>
+      <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
+        {label}
+      </label>
+      <input
+        type={type}
+        required
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+        {...inputProps}
+      />
+    </div>
+  );
+}
+
 export default function RegisterPage() {
   const router = useRouter();
   const [formData, setFormData] = useState({
@@ -17,6 +44,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+
+  const setField = (key: keyof typeof formData) => (value: string) =>
+    setFormData({ ...formData, [key]: value });
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -68,8 +98,8 @@ export default function RegisterPage() {
         router.push('/dashboard');
         router.refresh();
       }, 1000);
-    } catch (err: any) {
-      setErrorMessage(err?.message || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง');
+    } catch (err: unknown) {
+      setErrorMessage((err instanceof Error && err.message) || 'ไม่สามารถติดต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง');
       setLoading(false);
     }
   };
@@ -102,79 +132,43 @@ export default function RegisterPage() {
         )}
 
         <form onSubmit={handleRegister} className="space-y-4">
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-              Username
-            </label>
-            <input
-              type="text"
-              required
-              minLength={3}
-              maxLength={50}
-              value={formData.username}
-              onChange={(e) => setFormData({ ...formData, username: e.target.value })}
-              placeholder="เช่น somchai99"
-              className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-              ชื่อ-นามสกุล
-            </label>
-            <input
-              type="text"
-              required
-              minLength={2}
-              value={formData.fullName}
-              onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
-              placeholder="เช่น นายสมชาย ใจดี"
-              className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-              เบอร์โทรศัพท์
-            </label>
-            <input
-              type="tel"
-              required
-              value={formData.phone}
-              onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-              placeholder="เช่น 0812345678"
-              className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-              อีเมล
-            </label>
-            <input
-              type="email"
-              required
-              value={formData.email}
-              onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-              placeholder="name@example.com"
-              className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold uppercase tracking-wider text-gray-700 dark:text-gray-300 mb-1">
-              รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)
-            </label>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={formData.password}
-              onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-              placeholder="••••••••"
-              className="w-full px-3 py-2 text-sm border rounded-lg focus:ring-2 focus:ring-amber-500 focus:outline-none dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-            />
-          </div>
+          <FormField
+            label="Username"
+            minLength={3}
+            maxLength={50}
+            value={formData.username}
+            onChange={setField('username')}
+            placeholder="เช่น somchai99"
+          />
+          <FormField
+            label="ชื่อ-นามสกุล"
+            minLength={2}
+            value={formData.fullName}
+            onChange={setField('fullName')}
+            placeholder="เช่น นายสมชาย ใจดี"
+          />
+          <FormField
+            label="เบอร์โทรศัพท์"
+            type="tel"
+            value={formData.phone}
+            onChange={setField('phone')}
+            placeholder="เช่น 0812345678"
+          />
+          <FormField
+            label="อีเมล"
+            type="email"
+            value={formData.email}
+            onChange={setField('email')}
+            placeholder="name@example.com"
+          />
+          <FormField
+            label="รหัสผ่าน (อย่างน้อย 6 ตัวอักษร)"
+            type="password"
+            minLength={6}
+            value={formData.password}
+            onChange={setField('password')}
+            placeholder="••••••••"
+          />
 
           <button
             type="submit"

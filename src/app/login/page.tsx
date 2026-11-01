@@ -3,6 +3,8 @@
 import { useState, type FormEvent } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { safeRedirectPath } from '@/lib/auth/redirect';
+import { homePathForRole } from '@/lib/auth/roles';
 
 export default function LoginPage() {
   const router = useRouter();
@@ -50,21 +52,7 @@ export default function LoginPage() {
         : 'customer';
 
     const requestedDestination = new URLSearchParams(window.location.search).get('redirectTo');
-    const destinationUrl = requestedDestination
-      ? new URL(requestedDestination, window.location.origin)
-      : null;
-
-    let defaultDestination = '/dashboard';
-    if (role === 'seller') defaultDestination = '/seller';
-    else if (role === 'admin') defaultDestination = '/admin';
-
-    const destination =
-      destinationUrl?.origin === window.location.origin
-        ? `${destinationUrl.pathname}${destinationUrl.search}${destinationUrl.hash}`
-        : defaultDestination;
-
-    router.replace(destination);
-    router.refresh();
+    router.replace(safeRedirectPath(requestedDestination, homePathForRole(role)));
   };
 
   return (

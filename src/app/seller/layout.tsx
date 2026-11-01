@@ -1,44 +1,20 @@
-import { redirect } from 'next/navigation';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase/server';
-import type { Profile } from '@/types/database';
+import { signOut } from '@/lib/auth/actions';
+import { requireRole } from '@/lib/auth/session';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-async function handleSignOut() {
-  'use server';
-  const client = await createClient();
-  await client.auth.signOut();
-  redirect('/login');
-}
+const NAV_LINKS = [
+  { href: '/seller', label: 'ภาพรวม' },
+  { href: '/seller/orders', label: 'ออเดอร์' },
+  { href: '/seller/products', label: 'สินค้า' },
+];
 
 export default async function SellerLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient();
+  const { user, profile } = await requireRole('seller', '/seller');
 
-  // Server-side auth check (defense in depth — middleware also guards)
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
-    redirect('/login?redirectTo=/seller');
-  }
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('*')
-    .eq('id', user.id)
-    .maybeSingle();
-
-  const sellerProfile = profile as Profile | null;
-
-  if (sellerProfile?.role !== 'seller') {
-    redirect(sellerProfile?.role === 'admin' ? '/admin' : '/dashboard');
-  }
-
-  const displayName =
-    sellerProfile?.full_name || sellerProfile?.username || user.email?.split('@')[0] || 'ผู้ขาย';
+  const displayName = profile.full_name || profile.username || user.email?.split('@')[0] || 'ผู้ขาย';
 
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#0f1729', color: '#f0f4ff' }}>
@@ -86,27 +62,16 @@ export default async function SellerLayout({ children }: { children: React.React
 
           {/* Nav links */}
           <nav className="hidden sm:flex items-center gap-1">
-            <Link
-              href="/seller"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              style={{ color: 'rgba(240, 244, 255, 0.7)' }}
-            >
-              ภาพรวม
-            </Link>
-            <Link
-              href="/seller/orders"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              style={{ color: 'rgba(240, 244, 255, 0.7)' }}
-            >
-              ออเดอร์
-            </Link>
-            <Link
-              href="/seller/products"
-              className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
-              style={{ color: 'rgba(240, 244, 255, 0.7)' }}
-            >
-              สินค้า
-            </Link>
+            {NAV_LINKS.map(({ href, label }) => (
+              <Link
+                key={href}
+                href={href}
+                className="text-xs font-medium px-3 py-1.5 rounded-lg transition-colors"
+                style={{ color: 'rgba(240, 244, 255, 0.7)' }}
+              >
+                {label}
+              </Link>
+            ))}
           </nav>
 
           {/* User & Sign out */}
@@ -119,7 +84,7 @@ export default async function SellerLayout({ children }: { children: React.React
                 ผู้ขาย
               </span>
             </div>
-            <form action={handleSignOut}>
+            <form action={signOut}>
               <button
                 type="submit"
                 className="text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors"
@@ -136,15 +101,11 @@ export default async function SellerLayout({ children }: { children: React.React
 
         {/* Mobile nav */}
         <div className="sm:hidden flex border-t px-4 py-2 gap-4" style={{ borderColor: 'rgba(251, 146, 60, 0.1)' }}>
-          <Link href="/seller" className="text-xs font-medium" style={{ color: 'rgba(240, 244, 255, 0.7)' }}>
-            ภาพรวม
-          </Link>
-          <Link href="/seller/orders" className="text-xs font-medium" style={{ color: 'rgba(240, 244, 255, 0.7)' }}>
-            ออเดอร์
-          </Link>
-          <Link href="/seller/products" className="text-xs font-medium" style={{ color: 'rgba(240, 244, 255, 0.7)' }}>
-            สินค้า
-          </Link>
+          {NAV_LINKS.map(({ href, label }) => (
+            <Link key={href} href={href} className="text-xs font-medium" style={{ color: 'rgba(240, 244, 255, 0.7)' }}>
+              {label}
+            </Link>
+          ))}
         </div>
       </header>
 

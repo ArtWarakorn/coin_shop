@@ -183,6 +183,10 @@ http.createServer(async (req, res) => {
   }
   if (req.method === 'PATCH') {
     const rows = filterRows(state[table].filter((r) => visible[table](r, me) && writable[table](r, me)), q);
+    // Mirrors guard_profile_role(): non-admins may only go customer -> seller.
+    if (table === 'profiles' && body.role && roleOf(me) !== 'admin' && rows.some((r) => r.role !== body.role && !(r.role === 'customer' && body.role === 'seller'))) {
+      return send(res, 400, { code: 'P0001', message: 'role change not allowed' });
+    }
     rows.forEach((r) => Object.assign(r, body, { updated_at: day(0) }));
     return out(rows);
   }

@@ -87,6 +87,140 @@ await step('customer', async () => {
 });
 
 await mock('/__reset');
+await step('customer applies to become a seller', async () => {
+  const CUSTOMER = '00000000-0000-4000-8000-000000000001';
+  const roleNow = async () => (await mock('/__state')).profiles.find((p) => p.id === CUSTOMER).role;
+  const applyButton = (page) => page.getByRole('button', { name: 'สมัครเป็นร้านค้า', exact: true });
+
+  const page = await fresh();
+  await login(page, 'customer@test.local');
+  await page.waitForURL('**/dashboard');
+  await settle(page);
+  check('customer sees apply button', await applyButton(page).isVisible());
+
+  await applyButton(page).click();
+  check('apply asks for confirmation', await has(page, 'ยืนยันการสมัครเป็นร้านค้า'));
+  await page.getByRole('button', { name: 'ยกเลิก', exact: true }).click();
+  check('cancelling keeps the customer role', (await roleNow()) === 'customer');
+
+  await applyButton(page).click();
+  await page.getByRole('button', { name: 'ยืนยัน', exact: true }).click();
+  await page.waitForURL('**/seller', { timeout: 5000 });
+  await settle(page);
+  check('apply saves the seller role', (await roleNow()) === 'seller');
+  check('new seller sees applied message', await has(page, 'คุณสมัครร้านค้าเรียบร้อยแล้ว'));
+  await page.goto(`${APP}/seller/products`);
+  await settle(page);
+  check('new seller can open shop management', new URL(page.url()).pathname === '/seller/products', path(page));
+
+  await page.goto(`${APP}/dashboard`);
+  await settle(page);
+  check('seller opening /dashboard sees applied message', new URL(page.url()).pathname === '/seller' && (await has(page, 'คุณสมัครร้านค้าเรียบร้อยแล้ว')), path(page));
+  check('apply page clean of browser errors', page.problems.length === 0, page.problems.slice(0, 3).join(' | '));
+
+  await mock('/__reset');
+  const stale = await fresh();
+  await login(stale, 'customer@test.local');
+  await stale.waitForURL('**/dashboard');
+  await settle(stale);
+  await mock('/__set', { table: 'profiles', id: CUSTOMER, patch: { role: 'seller' } });
+  await applyButton(stale).click();
+  await stale.getByRole('button', { name: 'ยืนยัน', exact: true }).click();
+  await stale.waitForURL('**/seller', { timeout: 5000 });
+  check('stale tab of a seller moves on to /seller', true);
+
+  await mock('/__reset');
+  const blocked = await fresh();
+  await login(blocked, 'customer@test.local');
+  await blocked.waitForURL('**/dashboard');
+  await settle(blocked);
+  // What the guard answers until the 20261102 migration is applied.
+  await blocked.route('**/rest/v1/profiles*', (route) => (route.request().method() === 'PATCH'
+    ? route.fulfill({ status: 400, contentType: 'application/json', body: JSON.stringify({ code: 'P0001', message: 'role change not allowed' }) })
+    : route.continue()));
+  await applyButton(blocked).click();
+  await blocked.getByRole('button', { name: 'ยืนยัน', exact: true }).click();
+  await blocked.getByText('สมัครร้านค้าไม่สำเร็จ').first().waitFor({ timeout: 5000 });
+  check('rejected apply shows an error and stays on /dashboard', new URL(blocked.url()).pathname === '/dashboard' && (await roleNow()) === 'customer', path(blocked));
+  check('button works again after a rejected apply', await applyButton(blocked).isEnabled());
+
+  await mock('/__reset');
+  const admin = await fresh();
+  await login(admin, 'admin@test.local');
+  await admin.waitForURL('**/admin');
+  await admin.goto(`${APP}/dashboard`);
+  await settle(admin);
+  check('admin does not see apply button', (await applyButton(admin).count()) === 0);
+});
+
+await mock('/__reset');
+await step('seller places an order', async () => {
+  const SELLER = '00000000-0000-4000-8000-000000000002';
+  const OTHER_SELLER = '00000000-0000-4000-8000-000000000003';
+  const page = await fresh();
+  await login(page, 'seller@test.local');
+  await page.waitForURL('**/seller');
+  await settle(page);
+  await page.getByRole('link', { name: 'สั่งทำเหรียญ' }).click();
+  await page.waitForURL('**/seller/place-order');
+  await settle(page);
+  check('seller opens order page from overview', true);
+  check('seller order page starts with empty history', await has(page, 'ยังไม่มีรายการสั่งทำ'));
+  check('seller order page hides inactive product', !(await has(page, 'ลายซ่อน')));
+
+  await page.getByRole('link', { name: 'สั่งทำลายนี้' }).first().click();
+  await page.waitForFunction(() => location.search.includes('product=3'));
+  await settle(page);
+  check('"สั่งทำลายนี้" stays in the seller area', new URL(page.url()).pathname === '/seller/place-order', path(page));
+  check('"สั่งทำลายนี้" preselects for seller', (await page.$eval('#product-select', (e) => e.value)) === '3');
+
+  await page.fill('#quantity-input', '50');
+  await page.click('.btn-amber-submit');
+  await page.getByText('ส่งรายการสั่งทำ').first().waitFor({ timeout: 5000 });
+  const order = (await mock('/__state')).orders.at(-1);
+  check('seller order goes to the product owner', order.customer_id === SELLER && order.seller_id === OTHER_SELLER && order.total_price === 250, JSON.stringify(order));
+  check('seller sees the order in own history', await poll(() => has(page, '#104')));
+
+  await page.goto(`${APP}/seller/orders`);
+  await settle(page);
+  check('order bought from another shop is not in own queue', !(await has(page, '#104')));
+
+  await page.goto(`${APP}/seller/place-order?product=1`);
+  await settle(page);
+  await page.fill('#quantity-input', '60');
+  await page.click('.btn-amber-submit');
+  await page.getByText('ส่งรายการสั่งทำ').first().waitFor({ timeout: 5000 });
+  const own = (await mock('/__state')).orders.at(-1);
+  check('seller can order from own shop', own.customer_id === SELLER && own.seller_id === SELLER, JSON.stringify(own));
+  await page.goto(`${APP}/seller/orders`);
+  await settle(page);
+  check('own-shop order appears in own queue', await has(page, '#105'));
+  check('seller order page clean of browser errors', page.problems.length === 0, page.problems.slice(0, 3).join(' | '));
+
+  const other = await fresh();
+  await login(other, 'seller2@test.local');
+  await other.waitForURL('**/seller');
+  await settle(other);
+  await other.goto(`${APP}/seller/orders`);
+  await settle(other);
+  check('shop receives the order from another seller', await has(other, '#104'));
+
+  const customer = await fresh();
+  await login(customer, 'customer@test.local');
+  await customer.waitForURL('**/dashboard');
+  await settle(customer);
+  check('customer order links still use /dashboard', (await customer.getByRole('link', { name: 'สั่งทำลายนี้' }).first().getAttribute('href')).startsWith('/dashboard?'));
+  await customer.goto(`${APP}/seller/place-order`);
+  await settle(customer);
+  check('customer blocked from /seller/place-order', new URL(customer.url()).pathname === '/dashboard', path(customer));
+
+  const guest = await fresh();
+  await guest.goto(`${APP}/seller/place-order`);
+  await settle(guest);
+  check('guest sent to login from /seller/place-order', path(guest).startsWith('/login'), path(guest));
+});
+
+await mock('/__reset');
 await step('seller orders', async () => {
   const page = await fresh();
   await login(page, 'seller@test.local');
@@ -385,7 +519,7 @@ await step('round trips', async () => {
 });
 
 await step('mobile layout', async () => {
-  for (const [email, to] of [['customer@test.local', '/dashboard'], ['seller@test.local', '/seller'], ['seller@test.local', '/seller/orders'], ['seller@test.local', '/seller/products'], ['admin@test.local', '/admin']]) {
+  for (const [email, to] of [['customer@test.local', '/dashboard'], ['seller@test.local', '/seller'], ['seller@test.local', '/seller/orders'], ['seller@test.local', '/seller/products'], ['seller@test.local', '/seller/place-order'], ['admin@test.local', '/admin']]) {
     const page = await fresh({ width: 375, height: 700 });
     await login(page, email);
     await page.waitForLoadState('load');

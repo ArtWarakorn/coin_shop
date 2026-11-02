@@ -3,6 +3,7 @@ import { getCurrentProfile, requireUser } from '@/lib/auth/session';
 import { getAllOrders, getCustomerOrders } from '@/lib/data/orders';
 import { getActiveProducts } from '@/lib/data/products';
 import { createProfileFromAuth } from '@/lib/data/profiles';
+import BecomeSellerCard from './_components/BecomeSellerCard';
 import DashboardHeader from './_components/DashboardHeader';
 import OrderCustomizer from './_components/OrderCustomizer';
 import OrderHistory from './_components/OrderHistory';
@@ -58,6 +59,8 @@ export default async function DashboardPage({ searchParams }: DashboardPageProps
             Auth ID: <code className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{user.id}</code>
           </div>
         </div>
+
+        {profile?.role === 'customer' && <BecomeSellerCard userId={user.id} />}
 
         {products.length > 0 && (
           <OrderCustomizer

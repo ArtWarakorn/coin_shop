@@ -1,7 +1,13 @@
 import Link from 'next/link';
 import type { Product } from '@/types/database';
 
-export default function ProductGrid({ products }: { products: Product[] }) {
+interface ProductGridProps {
+  products: Product[];
+  /** Page holding the order form that "สั่งทำลายนี้" links to. */
+  orderPath?: string;
+}
+
+export default function ProductGrid({ products, orderPath = '/dashboard' }: ProductGridProps) {
   return (
     <section>
       <div className="flex items-center justify-between mb-4">
@@ -48,7 +54,7 @@ export default function ProductGrid({ products }: { products: Product[] }) {
                   {item.description || 'เหรียญโปรยทานริบบิ้น งานฝีมือประณีต'}
                 </p>
                 <Link
-                  href={`/dashboard?product=${item.id}#order-customizer`}
+                  href={`${orderPath}?product=${item.id}#order-customizer`}
                   scroll
                   className="mt-3 block w-full py-1.5 px-3 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg transition text-center"
                 >

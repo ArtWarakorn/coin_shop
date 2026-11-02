@@ -9,6 +9,7 @@ const NAV_LINKS = [
   { href: '/seller', label: 'ภาพรวม' },
   { href: '/seller/orders', label: 'ออเดอร์' },
   { href: '/seller/products', label: 'สินค้า' },
+  { href: '/seller/place-order', label: 'สั่งทำ' },
 ];
 
 export default async function SellerLayout({ children }: { children: React.ReactNode }) {

@@ -43,6 +43,19 @@ export default async function SellerDashboardPage() {
         </p>
       </div>
 
+      {/* Sellers who open /dashboard land here, so this is where they learn their status. */}
+      <p
+        role="status"
+        className="rounded-xl px-4 py-3 text-sm font-medium"
+        style={{
+          background: 'rgba(52,211,153,0.08)',
+          border: '1px solid rgba(52,211,153,0.2)',
+          color: '#6ee7b7',
+        }}
+      >
+        ✓ คุณสมัครร้านค้าเรียบร้อยแล้ว
+      </p>
+
       <StatusCountGrid counts={counts} />
       <UrgentOrderList orders={urgentOrders} />
       <QuickNav />

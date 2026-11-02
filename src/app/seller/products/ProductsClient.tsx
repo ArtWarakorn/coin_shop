@@ -12,9 +12,10 @@ import SlideOverPanel from './_components/SlideOverPanel';
 
 interface SellerProductsClientProps {
   initialProducts: SellerProduct[];
+  sellerId: string;
 }
 
-export default function SellerProductsClient({ initialProducts }: SellerProductsClientProps) {
+export default function SellerProductsClient({ initialProducts, sellerId }: SellerProductsClientProps) {
   const router = useRouter();
   const [products, setProducts] = useState<SellerProduct[]>(initialProducts);
   // Re-sync when the server sends a fresh list (after router.refresh()).
@@ -158,6 +159,7 @@ export default function SellerProductsClient({ initialProducts }: SellerProducts
           <ProductForm
             key={panelKey}
             initial={editTarget ?? undefined}
+            sellerId={sellerId}
             onSave={panel === 'create' ? handleCreate : handleEdit}
             onCancel={closePanel}
             isSaving={isSaving}

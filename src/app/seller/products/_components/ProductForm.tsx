@@ -1,36 +1,88 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { SellerProduct } from '@/types/seller';
 import { sanitizeUrl } from '../_lib/sanitize-url';
+import {
+  ACCEPTED_IMAGE_TYPES,
+  uploadProductImage,
+  validateProductImage,
+} from '../_lib/upload-product-image';
 
 interface ProductFormProps {
   initial?: Partial<SellerProduct>;
+  sellerId: string;
   onSave: (product: Partial<SellerProduct>) => Promise<void>;
   onCancel: () => void;
   isSaving: boolean;
 }
 
-export default function ProductForm({ initial, onSave, onCancel, isSaving }: ProductFormProps) {
+export default function ProductForm({ initial, sellerId, onSave, onCancel, isSaving }: ProductFormProps) {
   const [name, setName] = useState(initial?.name ?? '');
   const [imageUrl, setImageUrl] = useState(initial?.image_url ?? '');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState(initial?.description ?? '');
   const [price, setPrice] = useState<string>(initial?.price != null ? String(initial.price) : '3.50');
   const [isActive, setIsActive] = useState(initial?.is_active ?? true);
   const [validationError, setValidationError] = useState('');
 
   const safeImageSrc = sanitizeUrl(imageUrl);
+  const previewSrc = filePreviewUrl ?? safeImageSrc;
+  const isBusy = isSaving || isUploading;
+
+  useEffect(() => {
+    return () => {
+      if (filePreviewUrl) URL.revokeObjectURL(filePreviewUrl);
+    };
+  }, [filePreviewUrl]);
+
+  const selectFile = (file: File | null) => {
+    setImageFile(file);
+    setFilePreviewUrl(file ? URL.createObjectURL(file) : null);
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = ''; // lets the seller pick the same file again
+    if (!file) return;
+
+    const fileError = validateProductImage(file);
+    setValidationError(fileError ?? '');
+    if (!fileError) selectFile(file);
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setValidationError('');
 
     if (!name.trim()) { setValidationError('กรุณากรอกชื่อสินค้า'); return; }
-    if (!safeImageSrc) { setValidationError('กรุณากรอก URL รูปภาพที่ถูกต้อง (http/https)'); return; }
+    if (!imageFile && !safeImageSrc) {
+      setValidationError('กรุณาเลือกรูปจากเครื่อง หรือกรอก URL รูปภาพที่ถูกต้อง (http/https)');
+      return;
+    }
     const priceNum = parseFloat(price);
     if (isNaN(priceNum) || priceNum <= 0) { setValidationError('ราคาต้องมากกว่า 0'); return; }
 
+    let savedImageUrl = safeImageSrc;
+    if (imageFile) {
+      setIsUploading(true);
+      try {
+        savedImageUrl = await uploadProductImage(imageFile, sellerId);
+      } catch (err) {
+        setValidationError(`อัปโหลดรูปไม่สำเร็จ: ${err instanceof Error ? err.message : 'กรุณาลองใหม่อีกครั้ง'}`);
+        return;
+      } finally {
+        setIsUploading(false);
+      }
+      // A retry after a failed save reuses this upload instead of adding another file.
+      setImageUrl(savedImageUrl);
+      selectFile(null);
+    }
+
     await onSave({
       name: name.trim(),
-      image_url: safeImageSrc,
+      image_url: savedImageUrl,
       description: description.trim() || null,
       price: priceNum,
       is_active: isActive,
@@ -81,19 +133,49 @@ export default function ProductForm({ initial, onSave, onCancel, isSaving }: Pro
       </div>
 
       <div>
-        <label style={labelStyle}>URL รูปภาพ * (https://...)</label>
+        <span style={labelStyle}>รูปสินค้า *</span>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={ACCEPTED_IMAGE_TYPES}
+          onChange={handleFileChange}
+          aria-label="เลือกรูปสินค้าจากเครื่อง"
+          className="sr-only"
+        />
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isBusy}
+            className="flex-shrink-0 text-xs font-semibold px-3 py-2 rounded-xl transition-colors"
+            style={{
+              background: 'rgba(251,146,60,0.12)',
+              color: '#fb923c',
+              border: '1px solid rgba(251,146,60,0.3)',
+            }}
+          >
+            เลือกรูปจากเครื่อง
+          </button>
+          <span className="text-xs truncate" style={{ color: 'rgba(240,244,255,0.45)' }}>
+            {imageFile ? imageFile.name : 'JPG, PNG หรือ WebP ไม่เกิน 5 MB'}
+          </span>
+        </div>
+
+        <label style={{ ...labelStyle, marginTop: '0.75rem' }}>หรือใช้ URL รูปภาพ (https://...)</label>
         <input
           type="url"
           value={imageUrl}
-          onChange={(e) => setImageUrl(e.target.value)}
+          onChange={(e) => {
+            setImageUrl(e.target.value);
+            selectFile(null);
+          }}
           placeholder="https://..."
-          required
           style={inputStyle}
         />
-        {safeImageSrc && (
+        {previewSrc && (
           <div className="mt-2 rounded-xl overflow-hidden w-32 h-20" style={{ background: 'rgba(240,244,255,0.04)' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={safeImageSrc} alt="ตัวอย่างรูป" className="w-full h-full object-cover" />
+            <img src={previewSrc} alt="ตัวอย่างรูป" className="w-full h-full object-cover" />
           </div>
         )}
       </div>
@@ -148,7 +230,7 @@ export default function ProductForm({ initial, onSave, onCancel, isSaving }: Pro
         <button
           type="button"
           onClick={onCancel}
-          disabled={isSaving}
+          disabled={isBusy}
           className="flex-1 py-2.5 rounded-xl text-sm font-medium transition-colors"
           style={{
             background: 'rgba(240,244,255,0.06)',
@@ -160,14 +242,20 @@ export default function ProductForm({ initial, onSave, onCancel, isSaving }: Pro
         </button>
         <button
           type="submit"
-          disabled={isSaving}
+          disabled={isBusy}
           className="flex-1 py-2.5 rounded-xl text-sm font-bold transition-colors"
           style={{
-            background: isSaving ? 'rgba(251,146,60,0.3)' : 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
+            background: isBusy ? 'rgba(251,146,60,0.3)' : 'linear-gradient(135deg, #ea580c 0%, #f59e0b 100%)',
             color: '#fff',
           }}
         >
-          {isSaving ? 'กำลังบันทึก...' : initial?.id ? 'บันทึกการแก้ไข' : 'เพิ่มสินค้า'}
+          {isUploading
+            ? 'กำลังอัปโหลดรูป...'
+            : isSaving
+              ? 'กำลังบันทึก...'
+              : initial?.id
+                ? 'บันทึกการแก้ไข'
+                : 'เพิ่มสินค้า'}
         </button>
       </div>
     </form>

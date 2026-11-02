@@ -25,7 +25,7 @@ export default async function SellerProductsPage() {
         </p>
       </div>
 
-      <SellerProductsClient initialProducts={products} />
+      <SellerProductsClient initialProducts={products} sellerId={user.id} />
     </div>
   );
 }

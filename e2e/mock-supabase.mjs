@@ -39,6 +39,7 @@ function reset() {
       { id: 102, customer_id: C, product_id: 1, seller_id: S1, color: 'เงิน', quantity: 50, total_price: 175, customer_note: null, status: 'ready', due_date: day(4), created_at: day(-3), updated_at: day(-3) },
       { id: 103, customer_id: C, product_id: 3, seller_id: S2, color: 'ชมพู', quantity: 20, total_price: 100, customer_note: null, status: 'pending', due_date: day(3), created_at: day(-2), updated_at: day(-2) },
     ],
+    uploads: [],
   };
   requests = [];
   ttl = {};
@@ -109,9 +110,9 @@ http.createServer(async (req, res) => {
   const path = url.pathname;
   if (req.method === 'OPTIONS') return send(res, 204);
   const raw = await new Promise((ok) => { let d = ''; req.on('data', (c) => (d += c)); req.on('end', () => ok(d)); });
-  const body = raw ? JSON.parse(raw) : {};
+  const body = raw && !path.startsWith('/storage/') ? JSON.parse(raw) : {};
 
-  if (path === '/img.png') {
+  if (path === '/img.png' || path.startsWith('/storage/v1/object/public/')) {
     res.writeHead(200, { 'content-type': 'image/png', 'access-control-allow-origin': '*' });
     return res.end(Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64'));
   }
@@ -151,6 +152,17 @@ http.createServer(async (req, res) => {
     const c = verify(bearer);
     if (!c) return send(res, 401, { msg: 'invalid token' });
     return send(res, 200, userObj(state.users[c.email], c.email));
+  }
+
+  if (req.method === 'POST' && path.startsWith('/storage/v1/object/coin_shop/')) {
+    // Mirrors the coin_shop_seller_upload_product_image policy.
+    const name = decodeURIComponent(path.replace('/storage/v1/object/coin_shop/', ''));
+    const [root, owner] = name.split('/');
+    if (roleOf(me) !== 'seller' || root !== 'products' || owner !== me) {
+      return send(res, 400, { statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' });
+    }
+    state.uploads.push(name);
+    return send(res, 200, { Id: crypto.randomUUID(), Key: `coin_shop/${name}` });
   }
 
   if (path === '/rest/v1/rpc/seller_orders') {

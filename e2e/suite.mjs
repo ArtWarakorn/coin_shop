@@ -326,6 +326,88 @@ await step('seller products', async () => {
 });
 
 await mock('/__reset');
+await step('seller uploads a product image', async () => {
+  const SELLER = '00000000-0000-4000-8000-000000000002';
+  const PNG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==', 'base64');
+  const fileInput = (page) => page.locator('input[type=file]');
+  const submit = (page) => page.locator('form.space-y-4 button[type=submit]');
+  const openCreate = async (page) => {
+    await page.getByRole('button', { name: '+ เพิ่มสินค้า' }).click();
+    await page.fill('input[type=text]', 'ลายจากเครื่อง');
+  };
+  const open = async () => {
+    const page = await fresh();
+    await login(page, 'seller@test.local');
+    await page.waitForURL('**/seller');
+    await page.goto(`${APP}/seller/products`);
+    await settle(page);
+    return page;
+  };
+
+  const page = await open();
+  await openCreate(page);
+  await submit(page).click();
+  check('no image: asks for one, nothing saved', (await has(page, 'กรุณาเลือกรูปจากเครื่อง')) && !(await mock('/__state')).products.some((p) => p.name === 'ลายจากเครื่อง'));
+
+  await fileInput(page).setInputFiles({ name: 'a.gif', mimeType: 'image/gif', buffer: PNG });
+  check('unsupported file type rejected', await has(page, 'รองรับเฉพาะไฟล์ JPG, PNG หรือ WebP'));
+  await fileInput(page).setInputFiles({ name: 'big.png', mimeType: 'image/png', buffer: Buffer.alloc(5 * 1024 * 1024 + 1) });
+  check('file over 5 MB rejected', await has(page, 'ไม่เกิน 5 MB') && (await page.getByText('ไฟล์รูปต้องมีขนาดไม่เกิน').count()) === 1);
+  check('rejected files are not uploaded', (await mock('/__state')).uploads.length === 0);
+
+  await fileInput(page).setInputFiles({ name: 'coin.png', mimeType: 'image/png', buffer: PNG });
+  check('chosen file name shown', await has(page, 'coin.png'));
+  check('local preview before upload', (await page.getByAltText('ตัวอย่างรูป').getAttribute('src')).startsWith('blob:'));
+  check('nothing uploaded until save', (await mock('/__state')).uploads.length === 0);
+
+  await submit(page).click();
+  await page.getByText('เพิ่มสินค้าเรียบร้อย').waitFor({ timeout: 5000 });
+  let state = await mock('/__state');
+  const created = state.products.find((p) => p.name === 'ลายจากเครื่อง');
+  check('file saved in the seller folder', state.uploads.length === 1 && state.uploads[0].startsWith(`products/${SELLER}/`) && state.uploads[0].endsWith('.png'), state.uploads[0]);
+  check('product row stores the public URL', created?.image_url.endsWith(`/storage/v1/object/public/coin_shop/${state.uploads[0]}`), created?.image_url);
+  await settle(page);
+  const image = page.getByAltText('ลายจากเครื่อง').first();
+  check('uploaded image displays on the card', await poll(() => image.evaluate((e) => e.complete && e.naturalWidth > 0)));
+
+  const card = page.locator('div.rounded-2xl', { hasText: 'ลายดอกบัว' }).last();
+  await card.getByRole('button', { name: 'แก้ไข', exact: true }).click();
+  check('edit shows the current image', (await page.getByAltText('ตัวอย่างรูป').getAttribute('src')).includes('/img.png'));
+  await fileInput(page).setInputFiles({ name: 'new.webp', mimeType: 'image/webp', buffer: PNG });
+  await submit(page).click();
+  await page.getByText('แก้ไขสินค้าเรียบร้อย').waitFor({ timeout: 5000 });
+  state = await mock('/__state');
+  check('edit replaces the image', state.uploads.length === 2 && state.products.find((p) => p.id === 1).image_url.endsWith('.webp'));
+  check('image upload page clean of browser errors', page.problems.length === 0, page.problems.slice(0, 3).join(' | '));
+
+  await mock('/__reset');
+  const rejected = await open();
+  await rejected.route('**/storage/v1/object/coin_shop/**', (route) => route.fulfill({
+    status: 400,
+    contentType: 'application/json',
+    body: JSON.stringify({ statusCode: '403', error: 'Unauthorized', message: 'new row violates row-level security policy' }),
+  }));
+  await openCreate(rejected);
+  await fileInput(rejected).setInputFiles({ name: 'coin.png', mimeType: 'image/png', buffer: PNG });
+  await submit(rejected).click();
+  await rejected.getByText('อัปโหลดรูปไม่สำเร็จ').waitFor({ timeout: 5000 });
+  check('rejected upload: error shown, product not saved', !(await mock('/__state')).products.some((p) => p.name === 'ลายจากเครื่อง'));
+  check('rejected upload: form stays usable', await submit(rejected).isEnabled());
+
+  await rejected.unroute('**/storage/v1/object/coin_shop/**');
+  await rejected.route('**/rest/v1/products*', (route) => (route.request().method() === 'POST'
+    ? route.fulfill({ status: 500, contentType: 'application/json', body: JSON.stringify({ message: 'boom' }) })
+    : route.continue()));
+  await submit(rejected).click();
+  await rejected.getByText('เพิ่มสินค้าไม่สำเร็จ').first().waitFor({ timeout: 5000 });
+  await rejected.unroute('**/rest/v1/products*');
+  await submit(rejected).click();
+  await rejected.getByText('เพิ่มสินค้าเรียบร้อย').waitFor({ timeout: 5000 });
+  state = await mock('/__state');
+  check('retry after failed save reuses the upload', state.uploads.length === 1 && state.products.some((p) => p.name === 'ลายจากเครื่อง'), `uploads=${state.uploads.length}`);
+});
+
+await mock('/__reset');
 await step('admin', async () => {
   const page = await fresh();
   await login(page, 'admin@test.local');
